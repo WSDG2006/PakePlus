@@ -1,0 +1,2483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DQ签到系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js">
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js">
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">
+    </script>
+    <style>
+        /* ===== 基础样式 ===== */
+        :root {
+            --primary: #4f46e5;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+            --radius: 16px;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.08);
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: var(--font);
+            background: linear-gradient(135deg, #f0f4ff 0%, #fafbff 100%);
+            color: var(--gray-800);
+            min-height: 100vh;
+            padding: 24px;
+            -webkit-font-smoothing: antialiased;
+            position: relative;
+        }
+        .watermark-full {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 9998;
+            opacity: 0.2;
+            background-repeat: repeat;
+            background-size: 220px 220px;
+        }
+        @media print {
+            .watermark-full {
+                display: none !important;
+            }
+        }
+        .floating-nav {
+            position: fixed;
+            top: 16px;
+            right: 24px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            border-radius: 14px;
+            padding: 6px 8px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            display: flex;
+            gap: 4px;
+        }
+        .floating-nav .nav-tab {
+            padding: 8px 20px;
+            border: none;
+            background: transparent;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--gray-500);
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: inherit;
+            white-space: nowrap;
+        }
+        .floating-nav .nav-tab:hover {
+            color: var(--gray-700);
+            background: rgba(0, 0, 0, 0.04);
+        }
+        .floating-nav .nav-tab.active {
+            background: #fff;
+            color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            font-weight: 600;
+        }
+        @media (max-width: 768px) {
+            .floating-nav {
+                top: 12px;
+                right: 12px;
+                padding: 4px 6px;
+                border-radius: 12px;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                max-width: calc(100% - 24px);
+            }
+            .floating-nav .nav-tab {
+                padding: 6px 14px;
+                font-size: 13px;
+                flex-shrink: 0;
+            }
+        }
+        @media (max-width: 480px) {
+            .floating-nav {
+                top: 8px;
+                right: 8px;
+                padding: 3px 4px;
+                border-radius: 10px;
+            }
+            .floating-nav .nav-tab {
+                padding: 5px 10px;
+                font-size: 12px;
+            }
+        }
+
+        .app-container {
+            max-width: 1320px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            position: relative;
+            z-index: 1;
+        }
+        .app-header {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+            padding: 0 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            min-height: 80px;
+        }
+        .app-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+            font-size: 22px;
+            color: var(--gray-900);
+        }
+        .app-brand .brand-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 20px;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+        .app-brand .badge {
+            font-size: 12px;
+            font-weight: 500;
+            background: #eef2ff;
+            color: var(--primary);
+            padding: 2px 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(79, 70, 229, 0.15);
+        }
+        .app-header .header-spacer {
+            flex: 1;
+        }
+        @media (max-width: 768px) {
+            .app-header {
+                padding: 16px 20px;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+                min-height: 60px;
+            }
+            .app-brand {
+                font-size: 19px;
+                justify-content: center;
+            }
+        }
+        @media (max-width: 480px) {
+            .app-brand {
+                font-size: 17px;
+            }
+            .app-brand .brand-icon {
+                width: 32px;
+                height: 32px;
+                font-size: 16px;
+            }
+        }
+
+        .app-body {
+            padding: 32px;
+        }
+        .tab-panel {
+            display: none;
+            animation: fadeUp 0.35s ease;
+        }
+        .tab-panel.active {
+            display: block;
+        }
+        @keyframes fadeUp {
+            0% {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            border-radius: var(--radius);
+            padding: 24px 28px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow);
+            transition: 0.2s;
+        }
+        .card:hover {
+            box-shadow: var(--shadow-lg);
+            border-color: rgba(255, 255, 255, 0.9);
+        }
+        .card-title {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--gray-800);
+        }
+        .card-title .sub {
+            font-weight: 400;
+            font-size: 13px;
+            color: var(--gray-400);
+            margin-left: auto;
+            background: var(--gray-100);
+            padding: 2px 12px;
+            border-radius: 20px;
+        }
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .form-group {
+            flex: 1 1 200px;
+            min-width: 140px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--gray-600);
+            margin-bottom: 5px;
+        }
+        .form-control {
+            width: 100%;
+            padding: 11px 16px;
+            border: 1.5px solid var(--gray-200);
+            border-radius: 12px;
+            font-size: 14px;
+            transition: 0.2s;
+            background: #fff;
+            color: var(--gray-800);
+            font-family: inherit;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+        }
+        .form-control-sm {
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 11px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: inherit;
+            white-space: nowrap;
+            background: var(--gray-100);
+            color: var(--gray-700);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
+        }
+        .btn-primary:hover {
+            background: #4338ca;
+            box-shadow: 0 6px 24px rgba(79, 70, 229, 0.4);
+        }
+        .btn-success {
+            background: var(--success);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+        }
+        .btn-success:hover {
+            background: #059669;
+            box-shadow: 0 6px 24px rgba(16, 185, 129, 0.4);
+        }
+        .btn-danger {
+            background: var(--danger);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(239, 68, 68, 0.25);
+        }
+        .btn-danger:hover {
+            background: #dc2626;
+            box-shadow: 0 6px 24px rgba(239, 68, 68, 0.35);
+        }
+        .btn-outline {
+            background: transparent;
+            border: 1.5px solid var(--gray-200);
+            box-shadow: none;
+        }
+        .btn-outline:hover {
+            background: var(--gray-50);
+            border-color: var(--gray-300);
+        }
+        .btn-sm {
+            padding: 7px 16px;
+            font-size: 13px;
+            border-radius: 10px;
+        }
+        .btn-xs {
+            padding: 4px 12px;
+            font-size: 12px;
+            border-radius: 8px;
+        }
+
+        .employee-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 16px;
+            margin-top: 8px;
+        }
+        .employee-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            border-radius: var(--radius);
+            padding: 16px 18px 14px;
+            transition: 0.2s;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: var(--shadow);
+        }
+        .employee-card:hover {
+            box-shadow: var(--shadow-lg);
+            border-color: rgba(255, 255, 255, 0.9);
+            transform: translateY(-2px);
+        }
+        .employee-card .card-top {
+            display: flex;
+            justify-content: flex-end;
+            min-height: 28px;
+        }
+        .employee-card .card-top .del-btn {
+            background: none;
+            border: none;
+            color: var(--gray-400);
+            cursor: pointer;
+            font-size: 18px;
+            transition: 0.2s;
+            padding: 0 4px;
+            line-height: 1;
+        }
+        .employee-card .card-top .del-btn:hover {
+            color: var(--danger);
+            transform: scale(1.2);
+        }
+        .employee-card .card-name {
+            text-align: center;
+            font-weight: 600;
+            font-size: 18px;
+            color: var(--gray-800);
+            padding: 4px 0 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .employee-card .card-name .gender-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            font-size: 14px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .employee-card .card-name .gender-badge.male {
+            background: #dbeafe;
+            color: #3b82f6;
+        }
+        .employee-card .card-name .gender-badge.female {
+            background: #fce7f3;
+            color: #ec4899;
+        }
+        .employee-card .card-name .gender-badge.unknown {
+            background: var(--gray-100);
+            color: var(--gray-400);
+        }
+        .employee-card .barcode-container {
+            display: flex;
+            justify-content: center;
+            padding: 4px 0;
+            background: #fff;
+            border-radius: 8px;
+            min-height: 46px;
+            align-items: center;
+        }
+        .employee-card .barcode-container svg {
+            height: 38px;
+            width: auto;
+        }
+        .employee-card .card-bottom {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 2px;
+        }
+
+        .gender-filter {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .gender-filter .filter-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--gray-500);
+            margin-right: 4px;
+        }
+        .gender-filter .filter-btn {
+            padding: 4px 16px;
+            border: 1.5px solid var(--gray-200);
+            border-radius: 20px;
+            background: transparent;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: 0.2s;
+            color: var(--gray-600);
+        }
+        .gender-filter .filter-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        .gender-filter .filter-btn.active {
+            border-color: var(--primary);
+            background: #eef2ff;
+            color: var(--primary);
+        }
+        .gender-filter .filter-btn.active-male {
+            border-color: #3b82f6;
+            background: #dbeafe;
+            color: #3b82f6;
+        }
+        .gender-filter .filter-btn.active-female {
+            border-color: #ec4899;
+            background: #fce7f3;
+            color: #ec4899;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 16px;
+            color: var(--gray-400);
+        }
+        .empty-state .icon {
+            font-size: 52px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+        .search-box {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .search-box .form-group {
+            flex: 1 1 280px;
+            min-width: 160px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 18px;
+            margin-bottom: 28px;
+        }
+        .stat-item {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            text-align: center;
+            transition: 0.2s;
+            box-shadow: var(--shadow);
+        }
+        .stat-item:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+        .stat-number {
+            font-size: 34px;
+            font-weight: 700;
+            color: var(--gray-900);
+            line-height: 1.2;
+        }
+        .stat-number.primary {
+            color: var(--primary);
+        }
+        .stat-number.success {
+            color: var(--success);
+        }
+        .stat-number.danger {
+            color: var(--danger);
+        }
+        .stat-number.warning {
+            color: var(--warning);
+        }
+        .stat-label {
+            font-size: 13px;
+            color: var(--gray-500);
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
+        .checkin-list {
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .checkin-list::-webkit-scrollbar {
+            width: 4px;
+        }
+        .checkin-list::-webkit-scrollbar-thumb {
+            background: var(--gray-300);
+            border-radius: 8px;
+        }
+        .checkin-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 8px;
+            border-bottom: 1px solid var(--gray-100);
+            border-radius: 8px;
+            transition: 0.2s;
+        }
+        .checkin-item:hover {
+            background: rgba(238, 242, 255, 0.3);
+        }
+        .checkin-item .info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .checkin-item .name {
+            font-weight: 600;
+            color: var(--gray-800);
+        }
+        .checkin-item .id {
+            color: var(--gray-400);
+            font-size: 13px;
+            font-family: monospace;
+            background: var(--gray-100);
+            padding: 2px 10px;
+            border-radius: 6px;
+        }
+        .checkin-item .time {
+            color: var(--gray-500);
+            font-size: 13px;
+            background: rgba(0, 0, 0, 0.02);
+            padding: 2px 12px;
+            border-radius: 20px;
+        }
+        .checkin-item .del-btn {
+            background: none;
+            border: none;
+            color: var(--gray-400);
+            cursor: pointer;
+            font-size: 18px;
+            transition: 0.2s;
+            padding: 0 6px;
+            line-height: 1;
+        }
+        .checkin-item .del-btn:hover {
+            color: var(--danger);
+            transform: scale(1.2);
+        }
+        .checkin-item .checkbox-wrap {
+            display: flex;
+            align-items: center;
+            margin-right: 4px;
+        }
+        .checkin-item .checkbox-wrap input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+        .batch-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+            padding: 8px 0;
+        }
+
+        #reader {
+            width: 100%;
+            max-width: 400px;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: #0b0e14;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin: 0 auto;
+            border: 2px solid rgba(255, 255, 255, 0.08);
+            position: relative;
+        }
+        #reader video {
+            display: block;
+            width: 100%;
+            height: auto;
+            filter: contrast(1.05) brightness(0.95);
+        }
+        #reader::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70%;
+            height: 60%;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 12px;
+            pointer-events: none;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+            transition: border-color 0.3s;
+        }
+        #reader.scan-active::after {
+            border-color: var(--success);
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4), 0 0 20px rgba(16, 185, 129, 0.2);
+        }
+        .scanner-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+        }
+        .scanner-status {
+            font-size: 13px;
+            color: var(--gray-500);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.04);
+            padding: 6px 18px;
+            border-radius: 20px;
+            backdrop-filter: blur(4px);
+        }
+        .scanner-status .dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--gray-300);
+            transition: 0.2s;
+        }
+        .scanner-status .dot.active {
+            background: var(--success);
+            animation: pulse 1.4s ease-in-out infinite;
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+        }
+        @keyframes pulse {
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.3);
+                opacity: 0.6;
+            }
+        }
+
+        .toggle-wrap {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .toggle {
+            position: relative;
+            width: 50px;
+            height: 28px;
+            background: var(--gray-300);
+            border-radius: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+            flex-shrink: 0;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+        }
+        .toggle.on {
+            background: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+        }
+        .toggle .knob {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 22px;
+            height: 22px;
+            background: #fff;
+            border-radius: 50%;
+            transition: 0.2s;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+        .toggle.on .knob {
+            left: 25px;
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--gray-300);
+            border-radius: var(--radius);
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s;
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(4px);
+        }
+        .upload-zone:hover {
+            border-color: var(--primary);
+            background: rgba(238, 242, 255, 0.5);
+            transform: scale(1.01);
+        }
+        .upload-zone .icon {
+            font-size: 44px;
+            margin-bottom: 10px;
+            opacity: 0.7;
+        }
+        .upload-zone input[type="file"] {
+            display: none;
+        }
+
+        .toast-container {
+            position: fixed;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 420px;
+            width: 90%;
+            pointer-events: none;
+        }
+        .toast-container .toast {
+            pointer-events: auto;
+        }
+        .toast {
+            padding: 14px 22px;
+            border-radius: var(--radius);
+            background: rgba(31, 41, 55, 0.92);
+            backdrop-filter: blur(12px);
+            color: #fff;
+            font-size: 14px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+            animation: slideIn 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .toast.success {
+            background: rgba(16, 185, 129, 0.92);
+        }
+        .toast.error {
+            background: rgba(239, 68, 68, 0.92);
+        }
+        .toast.warning {
+            background: rgba(245, 158, 11, 0.92);
+        }
+        .toast.info {
+            background: rgba(79, 70, 229, 0.92);
+        }
+        @keyframes slideIn {
+            0% {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.96);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        .toast .close {
+            margin-left: auto;
+            cursor: pointer;
+            opacity: 0.6;
+            font-size: 20px;
+            line-height: 1;
+            background: none;
+            border: none;
+            color: inherit;
+            transition: 0.2s;
+        }
+        .toast .close:hover {
+            opacity: 1;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(8px);
+            z-index: 9998;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease;
+        }
+        .modal-overlay.hidden {
+            display: none;
+        }
+        @keyframes fadeIn {
+            0% {
+                opacity: 0;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+        .modal-box {
+            background: #fff;
+            border-radius: var(--radius);
+            padding: 32px 36px;
+            max-width: 440px;
+            width: 90%;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
+            animation: scaleUp 0.25s ease;
+        }
+        @keyframes scaleUp {
+            0% {
+                transform: scale(0.95);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        .modal-box .actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .app-footer {
+            text-align: center;
+            padding: 16px 20px 24px;
+            font-size: 13px;
+            color: var(--gray-400);
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .checkin-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .checkin-status-badge.active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .checkin-status-badge.inactive {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .checkin-name-display {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--gray-800);
+            letter-spacing: -0.3px;
+            padding: 2px 0;
+        }
+        .checkin-name-display .name-edit-hint {
+            font-size: 13px;
+            font-weight: 400;
+            color: var(--gray-400);
+            cursor: pointer;
+            margin-left: 8px;
+            transition: 0.2s;
+        }
+        .checkin-name-display .name-edit-hint:hover {
+            color: var(--primary);
+        }
+
+        .log-container {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            border: 1px solid var(--gray-200);
+        }
+        .log-container .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid var(--gray-100);
+            color: var(--gray-700);
+            display: flex;
+            gap: 16px;
+            font-size: 13px;
+        }
+        .log-container .log-entry:last-child {
+            border-bottom: none;
+        }
+        .log-container .log-time {
+            color: var(--gray-400);
+            flex-shrink: 0;
+            min-width: 150px;
+            font-size: 12px;
+        }
+        .log-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            margin-top: 4px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.5);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        th,
+        td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        th {
+            background: rgba(243, 244, 246, 0.6);
+            font-weight: 600;
+            color: var(--gray-600);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .print-header {
+            display: none;
+        }
+        .print-footer {
+            display: none;
+        }
+
+        /* ===== 打印样式（修复） ===== */
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 12mm 10mm 12mm 10mm;
+            }
+            body {
+                background: #fff !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                font-size: 12px !important;
+            }
+            .app-container {
+                background: #fff !important;
+                backdrop-filter: none !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                border: none !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+            }
+            .app-header,
+            .floating-nav,
+            .upload-zone,
+            .form-row,
+            .card .card-title .sub,
+            #reader,
+            .scanner-status,
+            .toggle-wrap,
+            .checkin-item .del-btn,
+            .app-footer,
+            .watermark-full,
+            .checkin-status-badge,
+            .gender-filter,
+            .search-box,
+            .batch-actions,
+            .checkin-item .checkbox-wrap,
+            .card .card-title .btn,
+            .btn,
+            .log-actions,
+            .log-container,
+            .card-title .btn {
+                display: none !important;
+            }
+            .tab-panel {
+                display: none !important;
+            }
+            #tabStats {
+                display: block !important;
+            }
+            /* 隐藏统计卡片的标题（但保留打印标题） */
+            #tabStats .card .card-title {
+                display: none !important;
+            }
+            #tabStats .stats-grid {
+                display: grid !important;
+                grid-template-columns: repeat(4, 1fr) !important;
+                gap: 8px !important;
+                margin-bottom: 14px !important;
+                page-break-inside: avoid;
+            }
+            #tabStats .stats-grid .stat-item {
+                border: 1px solid #d1d5db !important;
+                box-shadow: none !important;
+                padding: 8px 4px !important;
+                background: #f9fafb !important;
+                border-radius: 6px !important;
+                text-align: center !important;
+            }
+            #tabStats .stats-grid .stat-item .stat-number {
+                display: block !important;
+                font-size: 24px !important;
+                font-weight: 700 !important;
+                line-height: 1.2 !important;
+            }
+            #tabStats .stats-grid .stat-item .stat-label {
+                display: block !important;
+                font-size: 12px !important;
+                color: #6b7280 !important;
+                margin-top: 2px !important;
+                font-weight: 500 !important;
+            }
+            #tabStats .stats-grid .stat-item:nth-child(1) .stat-number {
+                color: #4f46e5 !important;
+            }
+            #tabStats .stats-grid .stat-item:nth-child(2) .stat-number {
+                color: #10b981 !important;
+            }
+            #tabStats .stats-grid .stat-item:nth-child(3) .stat-number {
+                color: #ef4444 !important;
+            }
+            #tabStats .stats-grid .stat-item:nth-child(4) .stat-number {
+                color: #f59e0b !important;
+            }
+
+            .print-header {
+                display: block !important;
+                text-align: center !important;
+                margin-bottom: 8px !important;
+                page-break-after: avoid;
+            }
+            .print-header .main-title {
+                font-size: 22px !important;
+                font-weight: 700 !important;
+                color: #111827 !important;
+                letter-spacing: 1px !important;
+                border-bottom: 3px double #e5e7eb !important;
+                padding-bottom: 6px !important;
+            }
+            .print-header .sub-title {
+                font-size: 13px !important;
+                color: #6b7280 !important;
+                margin-top: 4px !important;
+                font-weight: 400 !important;
+            }
+
+            #tabStats .card {
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                background: transparent !important;
+            }
+
+            /* ===== 修复表格边框 ===== */
+            #tabStats .table-wrap {
+                background: transparent !important;
+                border-radius: 0 !important;
+                margin-top: 4px !important;
+                overflow: visible !important;
+                border: none !important;
+            }
+            #tabStats .table-wrap table {
+                font-size: 12px !important;
+                border-collapse: collapse !important;
+                width: 100% !important;
+                border: 1px solid #d1d5db !important;
+            }
+            #tabStats .table-wrap th {
+                background: #e5e7eb !important;
+                font-weight: 600 !important;
+                color: #111827 !important;
+                padding: 6px 10px !important;
+                border: 1px solid #d1d5db !important;
+                text-align: center !important;
+                font-size: 11px !important;
+                text-transform: uppercase !important;
+                letter-spacing: 0.3px !important;
+            }
+            #tabStats .table-wrap td {
+                padding: 5px 10px !important;
+                border: 1px solid #d1d5db !important;
+                color: #1f2937 !important;
+                text-align: center !important;
+                vertical-align: middle !important;
+                font-size: 12px !important;
+            }
+            #tabStats .table-wrap tr:nth-child(even) td {
+                background: #f9fafb !important;
+            }
+            #tabStats .table-wrap tr:nth-child(odd) td {
+                background: #ffffff !important;
+            }
+
+            /* 空状态在打印时不再显示独立提示，由表格内提示代替 */
+            #tabStats .empty-state {
+                display: none !important;
+            }
+
+            .print-footer {
+                display: block !important;
+                text-align: center !important;
+                font-size: 11px !important;
+                color: #9ca3af !important;
+                margin-top: 12px !important;
+                border-top: 1px solid #e5e7eb !important;
+                padding-top: 6px !important;
+            }
+
+            #tabStats .table-wrap table {
+                page-break-inside: auto;
+            }
+            #tabStats .table-wrap tbody tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+            #tabStats .table-wrap thead {
+                display: table-header-group;
+            }
+            .app-body {
+                padding: 0 !important;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .app-header {
+                padding: 16px 20px;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+                min-height: 60px;
+            }
+            .app-brand {
+                font-size: 19px;
+                justify-content: center;
+            }
+            .app-body {
+                padding: 16px;
+            }
+            .form-row {
+                flex-direction: column;
+            }
+            .form-group {
+                flex: 1 1 auto;
+                width: 100%;
+            }
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+            }
+            .stat-number {
+                font-size: 26px;
+            }
+            .card {
+                padding: 18px 16px;
+            }
+            #reader {
+                max-width: 100%;
+            }
+            .employee-grid {
+                grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                gap: 12px;
+            }
+        }
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+            .stat-item {
+                padding: 14px 10px;
+            }
+            .stat-number {
+                font-size: 22px;
+            }
+            .employee-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .flex {
+            display: flex;
+        }
+        .flex-wrap {
+            flex-wrap: wrap;
+        }
+        .items-center {
+            align-items: center;
+        }
+        .justify-between {
+            justify-content: space-between;
+        }
+        .gap-8 {
+            gap: 8px;
+        }
+        .gap-12 {
+            gap: 12px;
+        }
+        .gap-16 {
+            gap: 16px;
+        }
+        .mt-8 {
+            margin-top: 8px;
+        }
+        .mt-16 {
+            margin-top: 16px;
+        }
+        .mb-8 {
+            margin-bottom: 8px;
+        }
+        .mb-16 {
+            margin-bottom: 16px;
+        }
+        .w-full {
+            width: 100%;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .text-muted {
+            color: var(--gray-400);
+        }
+
+        #printFrame {
+            display: none;
+            position: absolute;
+            width: 0;
+            height: 0;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 水印 -->
+    <div class="watermark-full" id="watermarkFull"></div>
+
+    <!-- 浮动导航 -->
+    <nav class="floating-nav" id="floatingNav">
+        <button class="nav-tab active" data-tab="tabCheckin">✅ 签到</button>
+        <button class="nav-tab" data-tab="tabAdmin">⚙️ 后台管理</button>
+        <button class="nav-tab" data-tab="tabStats">📊 统计与打印</button>
+    </nav>
+
+    <!-- Toast -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- 应用 -->
+    <div class="app-container">
+
+        <!-- 头部 -->
+        <header class="app-header">
+            <div class="app-brand">
+                <span class="brand-icon">📋</span> DQ签到系统 <span class="badge">v3.1</span>
+            </div>
+            <div class="header-spacer"></div>
+        </header>
+
+        <div class="app-body">
+
+            <!-- ===== 签到面板 ===== -->
+            <section class="tab-panel active" id="tabCheckin">
+                <div class="card">
+                    <div class="flex items-center justify-between flex-wrap gap-8">
+                        <div class="toggle-wrap">
+                            <span class="toggle-label">签到功能</span>
+                            <div class="toggle on" id="checkinToggle"><div class="knob"></div></div>
+                            <span class="toggle-status" id="toggleStatus">已开启</span>
+                        </div>
+                        <div class="flex items-center gap-12 flex-wrap">
+                            <span class="checkin-status-badge" id="timeStatusBadge"><span id="timeStatusDot">●</span><span id="timeStatusText">签到时间未设置</span></span>
+                            <span style="font-size:14px;color:var(--gray-400);font-weight:500;">📅 <span id="todayDate"></span></span>
+                        </div>
+                    </div>
+                    <div class="mt-8 flex items-center gap-8 flex-wrap">
+                        <span class="checkin-name-display" id="checkinNameDisplay">
+                            <span id="checkinNameText">📌 签到活动</span>
+                            <span class="name-edit-hint" id="nameEditHint">✎ 编辑</span>
+                        </span>
+                    </div>
+                    <div id="timeRangeDisplay" style="margin-top:4px;font-size:13px;color:var(--gray-500);"></div>
+                </div>
+
+                <div class="flex flex-wrap" style="gap:24px;">
+                    <div style="flex:1 1 420px;min-width:280px;">
+                        <div class="card">
+                            <div class="card-title">📷 扫描条形码 <span class="sub">Code 128 / QR</span></div>
+                            <div class="scanner-wrapper">
+                                <div id="reader"></div>
+                                <div class="scanner-status"><span class="dot" id="scannerDot"></span><span id="scannerStatusText">摄像头未启动</span></div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">⌨️ 手动签到</div>
+                            <div class="form-row">
+                                <div class="form-group" style="flex:2;">
+                                    <label>输入学号</label>
+                                    <input type="text" class="form-control" id="manualIdInput" placeholder="例如 S2024001" />
+                                </div>
+                                <div class="form-group" style="flex:0 0 auto;">
+                                    <button class="btn btn-primary" id="manualCheckinBtn">签到</button>
+                                </div>
+                            </div>
+                            <div id="manualFeedback" style="margin-top:10px;font-size:14px;color:var(--gray-500);"></div>
+                        </div>
+                    </div>
+                    <div style="flex:2 1 400px;min-width:280px;">
+                        <div class="card">
+                            <div class="card-title flex items-center justify-between flex-wrap gap-8">
+                                <span>📋 今日签到记录 <span class="sub" id="checkinCountLabel">0 人</span></span>
+                                <div class="flex gap-8 flex-wrap">
+                                    <button class="btn btn-danger btn-sm" id="batchDeleteBtn" style="display:none;">🗑️ 删除选中</button>
+                                    <button class="btn btn-outline btn-sm" id="toggleSelectBtn">☑️ 选择</button>
+                                </div>
+                            </div>
+                            <div class="batch-actions" id="batchActions" style="display:none;">
+                                <span class="batch-info">已选 <span id="selectedCount">0</span> 条</span>
+                                <button class="btn btn-outline btn-sm" id="selectAllBtn">全选</button>
+                                <button class="btn btn-outline btn-sm" id="deselectAllBtn">取消全选</button>
+                            </div>
+                            <div class="checkin-list" id="checkinList"><div class="empty-state"><div class="icon">📭</div><div class="text">今日暂无签到记录</div></div></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== 后台管理 ===== -->
+            <section class="tab-panel" id="tabAdmin">
+
+                <div class="card">
+                    <div class="card-title">📝 签到名称设置 <span class="sub">自定义当前签到活动的名称</span></div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:2;"><label>签到名称</label><input type="text" class="form-control" id="checkinNameInput" placeholder="例如：2026年Q1全体会议签到" /></div>
+                        <div class="form-group" style="flex:0 0 auto;"><button class="btn btn-primary" id="saveCheckinNameBtn">保存名称</button></div>
+                        <div class="form-group" style="flex:0 0 auto;"><button class="btn btn-outline" id="resetCheckinNameBtn">恢复默认</button></div>
+                    </div>
+                    <div id="checkinNameFeedback" style="margin-top:10px;font-size:14px;color:var(--gray-500);"></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">⏰ 签到时间设置 <span class="sub">设置允许签到的日期和时间段</span></div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:0 0 180px;"><label>开始日期</label><input type="date" class="form-control form-control-sm" id="checkinStartDate" /></div>
+                        <div class="form-group" style="flex:0 0 180px;"><label>开始时间</label><input type="time" class="form-control form-control-sm" id="checkinStartTime" /></div>
+                        <div class="form-group" style="flex:0 0 180px;"><label>结束日期</label><input type="date" class="form-control form-control-sm" id="checkinEndDate" /></div>
+                        <div class="form-group" style="flex:0 0 180px;"><label>结束时间</label><input type="time" class="form-control form-control-sm" id="checkinEndTime" /></div>
+                        <div class="form-group" style="flex:0 0 auto;"><button class="btn btn-primary" id="saveTimeRangeBtn">保存时间设置</button></div>
+                        <div class="form-group" style="flex:0 0 auto;"><button class="btn btn-outline" id="clearTimeRangeBtn">清除设置</button></div>
+                    </div>
+                    <div id="timeRangeFeedback" style="margin-top:10px;font-size:14px;color:var(--gray-500);"></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">📤 人员导入 <span class="sub">支持 .xlsx / .xls</span></div>
+                    <div class="upload-zone" id="uploadZone">
+                        <div class="icon">📁</div>
+                        <div class="hint">点击或拖拽上传 Excel 文件（需包含「学号」「姓名」「性别」列，性别可选填）</div>
+                        <input type="file" id="fileInput" accept=".xlsx,.xls" />
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; flex-wrap:wrap; gap:8px;">
+                        <div id="importFeedback" style="font-size:14px;color:var(--gray-500);"></div>
+                        <button class="btn btn-outline btn-sm" id="downloadTemplateBtn">📄 下载导入模板</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">➕ 手动添加人员</div>
+                    <div class="form-row">
+                        <div class="form-group"><label>学号 <span style="color:var(--danger);">*</span></label><input type="text" class="form-control" id="addIdInput" placeholder="输入学号" /></div>
+                        <div class="form-group"><label>姓名 <span style="color:var(--danger);">*</span></label><input type="text" class="form-control" id="addNameInput" placeholder="输入姓名" /></div>
+                        <div class="form-group"><label>性别</label><select class="form-control" id="addGenderInput"><option value="">未设置</option><option value="男">男</option><option value="女">女</option></select></div>
+                        <div class="form-group" style="flex:0 0 auto;"><button class="btn btn-success" id="addEmployeeBtn">添加</button></div>
+                    </div>
+                    <div id="addFeedback" style="margin-top:10px;font-size:14px;color:var(--gray-500);"></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title flex items-center justify-between flex-wrap gap-8">
+                        <span>👥 人员列表 <span class="sub" id="employeeCountLabel">0 人</span></span>
+                        <button class="btn btn-danger btn-sm" id="clearAllEmployeesBtn">🗑️ 删除全部人员</button>
+                    </div>
+                    <div class="search-box">
+                        <div class="form-group"><label>🔍 搜索人员</label><input type="text" class="form-control form-control-sm" id="searchEmployeeInput" placeholder="输入姓名或学号搜索..." /></div>
+                        <button class="btn btn-outline btn-sm" id="clearSearchBtn">清除</button>
+                    </div>
+                    <div class="gender-filter">
+                        <span class="filter-label">性别筛选：</span>
+                        <button class="filter-btn active" data-gender="all">全部</button>
+                        <button class="filter-btn" data-gender="男">👨 男</button>
+                        <button class="filter-btn" data-gender="女">👩 女</button>
+                        <button class="filter-btn" data-gender="unknown">❓ 未设置</button>
+                    </div>
+                    <div id="employeeGridContainer"></div>
+                    <div id="employeeEmpty" class="empty-state" style="display:none;"><div class="icon">👤</div><div class="text">暂无人员，请导入或添加</div></div>
+                </div>
+
+                <!-- 系统设置 -->
+                <div class="card">
+                    <div class="card-title">⚙️ 系统设置</div>
+                    <div class="flex flex-wrap gap-16 items-center" style="margin-bottom:12px;">
+                        <div class="toggle-wrap">
+                            <span class="toggle-label">签到功能开关</span>
+                            <div class="toggle on" id="settingToggle"><div class="knob"></div></div>
+                            <span class="toggle-status" id="settingToggleStatus">已开启</span>
+                        </div>
+                    </div>
+                    <div style="border-top:1px solid var(--gray-200);padding-top:16px;margin-top:4px;">
+                        <div style="font-weight:600;font-size:15px;color:var(--gray-700);margin-bottom:12px;">📦 数据管理</div>
+                        <div class="flex flex-wrap gap-12 items-center">
+                            <button class="btn btn-outline btn-sm" id="exportBackupBtn">💾 导出备份</button>
+                            <button class="btn btn-outline btn-sm" id="importBackupBtn">📂 导入备份</button>
+                            <input type="file" id="backupFileInput" accept=".json" style="display:none;" />
+                            <button class="btn btn-danger btn-sm" id="clearAllDataBtn">🗑️ 清除全部数据</button>
+                            <span style="font-size:12px;color:var(--gray-400);">此操作不可恢复</span>
+                        </div>
+                        <div id="backupFeedback" style="margin-top:8px;font-size:13px;color:var(--gray-500);"></div>
+                    </div>
+                    <div style="border-top:1px solid var(--gray-200);padding-top:16px;margin-top:12px;">
+                        <div style="font-weight:600;font-size:15px;color:var(--gray-700);margin-bottom:8px;">📋 系统日志</div>
+                        <div class="log-container" id="logContainer"><div class="log-entry" style="color:var(--gray-400);">暂无日志记录</div></div>
+                        <div class="log-actions">
+                            <button class="btn btn-outline btn-sm" id="clearLogBtn">清空日志</button>
+                            <button class="btn btn-outline btn-sm" id="printLogBtn">🖨️ 打印日志</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== 统计与打印 ===== -->
+            <section class="tab-panel" id="tabStats">
+                <div class="stats-grid" id="statsGrid">
+                    <div class="stat-item"><div class="stat-number primary" id="statTotal">0</div><div class="stat-label">总人数</div></div>
+                    <div class="stat-item"><div class="stat-number success" id="statChecked">0</div><div class="stat-label">签到人数</div></div>
+                    <div class="stat-item"><div class="stat-number danger" id="statUnchecked">0</div><div class="stat-label">未签到人数</div></div>
+                    <div class="stat-item"><div class="stat-number warning" id="statRate">0%</div><div class="stat-label">签到率</div></div>
+                </div>
+                <div class="card">
+                    <div class="print-header"><div class="main-title" id="printMainTitle">签到表</div><div class="sub-title" id="printSubTitle">签到时间：未设置</div></div>
+                    <div class="card-title flex items-center justify-between flex-wrap gap-8">
+                        <span>📋 今日已签到人员</span>
+                        <div class="flex gap-8 flex-wrap">
+                            <button class="btn btn-primary btn-sm" id="printBtn">🖨️ 打印</button>
+                            <button class="btn btn-danger btn-sm" id="clearTodayBtn">🗑️ 签到清理记录</button>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>序号</th><th>姓名</th><th>学号</th><th>性别</th></tr></thead>
+                            <tbody id="statsTableBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="print-footer">打印时间：<span id="printTimeFooter"></span></div>
+                </div>
+            </section>
+
+        </div><!-- /app-body -->
+
+        <div class="app-footer">© 2026 王申彪 版权所有</div>
+    </div><!-- /app-container -->
+
+    <!-- 确认弹窗 -->
+    <div class="modal-overlay hidden" id="confirmModal">
+        <div class="modal-box">
+            <h3 id="confirmTitle">确认操作</h3>
+            <p id="confirmMessage">确定要执行此操作吗？</p>
+            <div class="actions">
+                <button class="btn btn-outline" id="confirmCancel">取消</button>
+                <button class="btn btn-danger" id="confirmOk">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 打印专用 iframe（隐藏，用于日志打印） -->
+    <iframe id="printFrame"></iframe>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // ============================================================
+            // 日志系统（去重）
+            // ============================================================
+            const Logger = {
+                _logs: [],
+                _last: '',
+                _lastTime: 0,
+                init() {
+                    try { this._logs = JSON.parse(localStorage.getItem('system_logs')) || []; } catch (e) {}
+                },
+                log(msg, level = 'info') {
+                    const now = Date.now();
+                    if (msg === this._last && now - this._lastTime < 3000) return;
+                    this._last = msg;
+                    this._lastTime = now;
+                    this._logs.push({ time: new Date().toLocaleString('zh-CN', { hour12: false }), message: msg });
+                    if (this._logs.length > 500) this._logs = this._logs.slice(-500);
+                    localStorage.setItem('system_logs', JSON.stringify(this._logs));
+                    this._render();
+                },
+                get() { return this._logs; },
+                clear() { this._logs = [];
+                    localStorage.removeItem('system_logs');
+                    this._render(); },
+                _render() {
+                    const c = document.getElementById('logContainer');
+                    if (!c) return;
+                    if (!this._logs.length) { c.innerHTML = '<div class="log-entry" style="color:var(--gray-400);">暂无日志记录</div>'; return; }
+                    c.innerHTML = this._logs.slice().reverse().map(e =>
+                        `<div class="log-entry"><span class="log-time">${e.time}</span><span class="log-msg">${e.message}</span></div>`
+                    ).join('');
+                }
+            };
+
+            // ============================================================
+            // 数据层
+            // ============================================================
+            const DB = {
+                getEmployees() { try { return JSON.parse(localStorage.getItem('attendance_employees')) || []; } catch { return []; } },
+                setEmployees(d) { localStorage.setItem('attendance_employees', JSON.stringify(d));
+                    Logger.log(`更新人员列表：${d.length} 人`); },
+                getAttendance() { try { return JSON.parse(localStorage.getItem('attendance_records')) || []; } catch { return []; } },
+                setAttendance(d) { localStorage.setItem('attendance_records', JSON.stringify(d)); },
+                getSettings() { try { return JSON.parse(localStorage.getItem('attendance_settings')) || { checkinEnabled: true }; } catch { return { checkinEnabled: true }; } },
+                setSettings(d) { localStorage.setItem('attendance_settings', JSON.stringify(d));
+                    Logger.log(`签到功能已${d.checkinEnabled ? '开启' : '关闭'}`); },
+                getTimeRange() { try { return JSON.parse(localStorage.getItem('attendance_time_range')) || { startDate: '',
+                        startTime: '', endDate: '', endTime: '' }; } catch { return { startDate: '', startTime: '',
+                        endDate: '', endTime: '' }; } },
+                setTimeRange(d) {
+                    localStorage.setItem('attendance_time_range', JSON.stringify(d));
+                    if (d.startDate && d.startTime && d.endDate && d.endTime) Logger.log(
+                        `签到时间设置为 ${d.startDate} ${d.startTime} - ${d.endDate} ${d.endTime}`);
+                    else Logger.log('已清除签到时间设置');
+                },
+                getCheckinName() { try { return localStorage.getItem('attendance_checkin_name') || ''; } catch { return ''; } },
+                setCheckinName(n) { localStorage.setItem('attendance_checkin_name', n);
+                    Logger.log(`签到名称更新为「${n}」`); },
+                clearAll() {
+                    this.setEmployees([]);
+                    this.setAttendance([]);
+                    this.setSettings({ checkinEnabled: true });
+                    this.setTimeRange({ startDate: '', startTime: '', endDate: '', endTime: '' });
+                    this.setCheckinName('');
+                    Logger.log('已清除全部数据');
+                }
+            };
+
+            // ============================================================
+            // 工具
+            // ============================================================
+            const todayStr = () => new Date().toISOString().slice(0, 10);
+            const isToday = (ts) => new Date(ts).toISOString().slice(0, 10) === todayStr();
+            const fmtTime = (ts) => new Date(ts).toLocaleString('zh-CN', { hour12: false });
+            const fmtShort = (ts) => new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            const getToday = (r) => r.filter(r => isToday(r.timestamp));
+            const getEmp = (list, id) => list.find(e => e.id === id);
+            const getEmpName = (list, id) => { const e = getEmp(list, id); return e ? e.name : '未知'; };
+            const genderDisplay = (g) => { if (g === '男') return '男'; if (g === '女') return '女'; return '-'; };
+            const genderClass = (g) => { if (g === '男') return 'male'; if (g === '女') return 'female'; return 'unknown'; };
+
+            const isInRange = () => {
+                const r = DB.getTimeRange();
+                if (!r.startDate || !r.startTime || !r.endDate || !r.endTime) return true;
+                const now = new Date(),
+                    s = new Date(r.startDate + 'T' + r.startTime),
+                    e = new Date(r.endDate + 'T' + r.endTime);
+                return now >= s && now <= e;
+            };
+            const rangeDisplay = () => {
+                const r = DB.getTimeRange();
+                return (r.startDate && r.startTime && r.endDate && r.endTime) ?
+                    `${r.startDate} ${r.startTime} - ${r.endDate} ${r.endTime}` :
+                    '未设置（全天可签到）';
+            };
+
+            // ============================================================
+            // Toast（去重）
+            // ============================================================
+            let _lastToast = '',
+                _lastToastTime = 0;
+
+            function showToast(msg, type = 'info') {
+                const now = Date.now();
+                if (msg === _lastToast && now - _lastToastTime < 3000) return;
+                _lastToast = msg;
+                _lastToastTime = now;
+                const c = document.getElementById('toastContainer');
+                const t = document.createElement('div');
+                t.className = `toast ${type}`;
+                const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+                t.innerHTML = `<span>${icons[type] || 'ℹ️'}</span><span>${msg}</span><button class="close">&times;</button>`;
+                t.querySelector('.close').onclick = () => t.remove();
+                c.appendChild(t);
+                setTimeout(() => { if (t.parentNode) t.remove(); }, 4000);
+                Logger.log(msg);
+            }
+
+            // ============================================================
+            // 确认弹窗
+            // ============================================================
+            let confirmResolve = null;
+
+            function showConfirm(title, msg) {
+                return new Promise((resolve) => {
+                    document.getElementById('confirmTitle').textContent = title;
+                    document.getElementById('confirmMessage').textContent = msg;
+                    document.getElementById('confirmModal').classList.remove('hidden');
+                    confirmResolve = resolve;
+                });
+            }
+            document.getElementById('confirmCancel').onclick = () => {
+                document.getElementById('confirmModal').classList.add('hidden');
+                if (confirmResolve) { confirmResolve(false);
+                    confirmResolve = null; }
+            };
+            document.getElementById('confirmOk').onclick = () => {
+                document.getElementById('confirmModal').classList.add('hidden');
+                if (confirmResolve) { confirmResolve(true);
+                    confirmResolve = null; }
+            };
+            document.getElementById('confirmModal').onclick = (e) => {
+                if (e.target === e.currentTarget) {
+                    document.getElementById('confirmModal').classList.add('hidden');
+                    if (confirmResolve) { confirmResolve(false);
+                        confirmResolve = null; }
+                }
+            };
+
+            // ============================================================
+            // 渲染
+            // ============================================================
+            let selectMode = false,
+                selectedTimestamps = new Set();
+
+            function renderEmployees(search, gender) {
+                const emps = DB.getEmployees();
+                let filtered = emps;
+                if (search && search.trim()) {
+                    const s = search.trim().toLowerCase();
+                    filtered = filtered.filter(e => e.name.toLowerCase().includes(s) || e.id.toLowerCase().includes(s));
+                }
+                if (gender && gender !== 'all') {
+                    if (gender === 'unknown') filtered = filtered.filter(e => !e.gender || e.gender === '');
+                    else filtered = filtered.filter(e => e.gender === gender);
+                }
+                document.getElementById('employeeCountLabel').textContent = `${filtered.length} 人`;
+                const container = document.getElementById('employeeGridContainer');
+                const empty = document.getElementById('employeeEmpty');
+                if (!filtered.length) {
+                    container.innerHTML = '';
+                    empty.style.display = 'block';
+                    empty.querySelector('.text').textContent = emps.length ? '未找到匹配的人员' : '暂无人员，请导入或添加';
+                    return;
+                }
+                empty.style.display = 'none';
+                let html = '<div class="employee-grid">';
+                filtered.forEach((emp, idx) => {
+                    const gd = genderDisplay(emp.gender),
+                        gc = genderClass(emp.gender);
+                    const icon = gd === '男' ? '👨' : gd === '女' ? '👩' : '❓';
+                    html += `<div class="employee-card">
+                        <div class="card-top"><button class="del-btn delete-employee" data-id="${emp.id}">✕</button></div>
+                        <div class="card-name">${emp.name}<span class="gender-badge ${gc}">${icon}</span></div>
+                        <div class="barcode-container" id="barcode-${emp.id}-${idx}"></div>
+                        <div class="card-bottom"><button class="btn btn-primary btn-xs single-checkin" data-id="${emp.id}">✅ 签到</button></div>
+                    </div>`;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+                filtered.forEach((emp, idx) => {
+                    const el = document.getElementById(`barcode-${emp.id}-${idx}`);
+                    if (el) {
+                        try { JsBarcode(el, emp.id, { format: 'CODE128', width: 1.2, height: 36, displayValue: false,
+                                background: '#fff', lineColor: '#1e293b', margin: 2 }); } catch (e) { el.textContent =
+                                emp.id; }
+                    }
+                });
+                document.querySelectorAll('.single-checkin').forEach(b => b.onclick = function() { performCheckin(this.dataset
+                        .id); });
+                document.querySelectorAll('.delete-employee').forEach(b => b.onclick = async function() {
+                    const id = this.dataset.id;
+                    const emp = getEmp(DB.getEmployees(), id);
+                    if (!emp) return;
+                    if (await showConfirm('删除人员', `确定要删除「${emp.name}」(学号: ${id}) 吗？`)) {
+                        DB.setEmployees(DB.getEmployees().filter(e => e.id !== id));
+                        renderAll();
+                        showToast(`已删除「${emp.name}」`, 'success');
+                    }
+                });
+            }
+
+            function renderCheckinList() {
+                const records = DB.getAttendance(),
+                    today = getToday(records);
+                document.getElementById('checkinCountLabel').textContent = `${today.length} 人`;
+                const container = document.getElementById('checkinList');
+                const batchBtn = document.getElementById('batchDeleteBtn');
+                if (selectMode) {
+                    document.getElementById('batchActions').style.display = 'flex';
+                    batchBtn.style.display = 'inline-flex';
+                    document.getElementById('selectedCount').textContent = selectedTimestamps.size;
+                    batchBtn.disabled = selectedTimestamps.size === 0;
+                } else {
+                    document.getElementById('batchActions').style.display = 'none';
+                    batchBtn.style.display = 'none';
+                    selectedTimestamps.clear();
+                }
+                if (!today.length) {
+                    container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><div class="text">今日暂无签到记录</div></div>';
+                    return;
+                }
+                const emps = DB.getEmployees();
+                const sorted = [...today].sort((a, b) => b.timestamp - a.timestamp);
+                container.innerHTML = sorted.map((r, idx) => {
+                    const name = getEmpName(emps, r.employeeId);
+                    const checked = selectMode && selectedTimestamps.has(r.timestamp) ? 'checked' : '';
+                    return `<div class="checkin-item">
+                        ${selectMode ? `<div class="checkbox-wrap"><input type="checkbox" class="checkin-checkbox" data-timestamp="${r.timestamp}" ${checked} /></div>` : ''}
+                        <div class="info"><span class="name">${name}</span><span class="id">${r.employeeId}</span></div>
+                        <div class="flex items-center gap-8">
+                            <span class="time">${fmtShort(r.timestamp)}</span>
+                            ${!selectMode ? `<button class="del-btn delete-checkin" data-timestamp="${r.timestamp}">✕</button>` : ''}
+                        </div>
+                    </div>`;
+                }).join('');
+                if (!selectMode) {
+                    container.querySelectorAll('.delete-checkin').forEach(b => b.onclick = async function(e) {
+                        e.stopPropagation();
+                        const ts = parseInt(this.dataset.timestamp);
+                        const record = DB.getAttendance().find(r => r.timestamp === ts);
+                        if (!record) return;
+                        const name = getEmpName(DB.getEmployees(), record.employeeId);
+                        if (await showConfirm('删除签到记录', `确定要删除「${name}」的签到记录吗？`)) {
+                            DB.setAttendance(DB.getAttendance().filter(r => r.timestamp !== ts));
+                            renderAll();
+                            showToast('已删除该签到记录', 'success');
+                        }
+                    });
+                }
+                if (selectMode) {
+                    container.querySelectorAll('.checkin-checkbox').forEach(cb => {
+                        cb.onchange = function() {
+                            const ts = parseInt(this.dataset.timestamp);
+                            this.checked ? selectedTimestamps.add(ts) : selectedTimestamps.delete(ts);
+                            document.getElementById('selectedCount').textContent = selectedTimestamps.size;
+                            document.getElementById('batchDeleteBtn').disabled = selectedTimestamps.size === 0;
+                        };
+                    });
+                }
+            }
+
+            function renderStats() {
+                const emps = DB.getEmployees(),
+                    records = DB.getAttendance(),
+                    today = getToday(records);
+                const total = emps.length,
+                    checked = today.length,
+                    unchecked = total - checked,
+                    rate = total ? Math.round(checked / total * 100) : 0;
+                document.getElementById('statTotal').textContent = total;
+                document.getElementById('statChecked').textContent = checked;
+                document.getElementById('statUnchecked').textContent = unchecked;
+                document.getElementById('statRate').textContent = `${rate}%`;
+                const name = DB.getCheckinName() || '签到表';
+                document.getElementById('printMainTitle').textContent = name;
+                document.getElementById('printSubTitle').textContent = `签到时间：${rangeDisplay()}`;
+                document.getElementById('printTimeFooter').textContent = new Date().toLocaleString('zh-CN');
+                const tbody = document.getElementById('statsTableBody');
+                if (!checked) {
+                    // 无数据时显示提示行（已移除独立空状态）
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--gray-400);padding:16px;">今日暂无已签到人员</td></tr>`;
+                    return;
+                }
+                const sorted = [...today].sort((a, b) => b.timestamp - a.timestamp);
+                tbody.innerHTML = sorted.map((r, idx) => {
+                    const emp = getEmp(emps, r.employeeId);
+                    return `<tr><td>${idx+1}</td><td><strong>${emp?.name || '未知'}</strong></td><td>${r.employeeId}</td><td>${emp?.gender || '-'}</td></tr>`;
+                }).join('');
+            }
+
+            function updateUI() {
+                const s = DB.getSettings();
+                const toggles = [document.getElementById('checkinToggle'), document.getElementById('settingToggle')];
+                const statuses = [document.getElementById('toggleStatus'), document.getElementById('settingToggleStatus')];
+                toggles.forEach((t, i) => {
+                    if (!t) return;
+                    s.checkinEnabled ? t.classList.add('on') : t.classList.remove('on');
+                    if (statuses[i]) statuses[i].textContent = s.checkinEnabled ? '已开启' : '已关闭';
+                });
+                const name = DB.getCheckinName() || '📌 签到活动';
+                document.getElementById('checkinNameText').textContent = name;
+                document.getElementById('checkinNameInput').value = name;
+                const range = DB.getTimeRange();
+                document.getElementById('checkinStartDate').value = range.startDate || '';
+                document.getElementById('checkinStartTime').value = range.startTime || '';
+                document.getElementById('checkinEndDate').value = range.endDate || '';
+                document.getElementById('checkinEndTime').value = range.endTime || '';
+                document.getElementById('todayDate').textContent = new Date().toLocaleDateString('zh-CN', { year: 'numeric',
+                    month: 'long', day: 'numeric', weekday: 'short' });
+                const badge = document.getElementById('timeStatusBadge'),
+                    dot = document.getElementById('timeStatusDot'),
+                    text = document.getElementById('timeStatusText');
+                document.getElementById('timeRangeDisplay').textContent = `⏰ 签到时间：${rangeDisplay()}`;
+                if (!range.startDate || !range.startTime || !range.endDate || !range.endTime) {
+                    badge.className = 'checkin-status-badge active';
+                    dot.textContent = '●';
+                    text.textContent = '签到时间未设置（全天可签到）';
+                } else if (isInRange()) {
+                    badge.className = 'checkin-status-badge active';
+                    dot.textContent = '●';
+                    text.textContent = '当前在签到时间段内 ✓';
+                } else {
+                    badge.className = 'checkin-status-badge inactive';
+                    dot.textContent = '●';
+                    text.textContent = '当前不在签到时间段内 ✗';
+                }
+            }
+
+            function renderAll() {
+                const search = document.getElementById('searchEmployeeInput').value;
+                const gender = document.querySelector('.gender-filter .filter-btn.active')?.dataset.gender || 'all';
+                renderEmployees(search, gender);
+                renderCheckinList();
+                renderStats();
+                updateUI();
+            }
+
+            // ============================================================
+            // 签到
+            // ============================================================
+            function performCheckin(id) {
+                const settings = DB.getSettings();
+                if (!settings.checkinEnabled) { showToast('签到功能已关闭', 'warning'); return false; }
+                const range = DB.getTimeRange();
+                if (range.startDate && range.startTime && range.endDate && range.endTime && !isInRange()) {
+                    showToast(`当前不在签到时间段内（${range.startDate} ${range.startTime} - ${range.endDate} ${range.endTime}）`,
+                        'warning');
+                    return false;
+                }
+                const emps = DB.getEmployees();
+                const emp = getEmp(emps, id);
+                if (!emp) { showToast(`未找到学号: ${id}`, 'error'); return false; }
+                const records = DB.getAttendance();
+                if (records.some(r => r.employeeId === id && isToday(r.timestamp))) {
+                    showToast(`「${emp.name}」今日已签到`, 'warning');
+                    return false;
+                }
+                records.push({ employeeId: id, timestamp: Date.now(), date: todayStr() });
+                DB.setAttendance(records);
+                renderAll();
+                showToast(`✅ 「${emp.name}」签到成功！`, 'success');
+                return true;
+            }
+
+            // ============================================================
+            // 批量删除
+            // ============================================================
+            async function batchDelete() {
+                if (!selectedTimestamps.size) { showToast('请先选择要删除的签到记录', 'warning'); return; }
+                if (await showConfirm('批量删除', `确定要删除选中的 ${selectedTimestamps.size} 条签到记录吗？`)) {
+                    DB.setAttendance(DB.getAttendance().filter(r => !selectedTimestamps.has(r.timestamp)));
+                    selectedTimestamps.clear();
+                    selectMode = false;
+                    document.getElementById('toggleSelectBtn').textContent = '☑️ 选择';
+                    renderAll();
+                    showToast('已删除选中的签到记录', 'success');
+                }
+            }
+
+            // ============================================================
+            // 清空今日签到记录
+            // ============================================================
+            async function clearTodayRecords() {
+                const records = DB.getAttendance();
+                const todayRecords = getToday(records);
+                if (!todayRecords.length) {
+                    showToast('今日暂无签到记录，无需清理', 'warning');
+                    return;
+                }
+                const count = todayRecords.length;
+                if (await showConfirm('清理今日签到', `确定要清空今日所有签到记录（共 ${count} 条）吗？此操作不可恢复！`)) {
+                    // 保留非今日记录
+                    const newRecords = records.filter(r => !isToday(r.timestamp));
+                    DB.setAttendance(newRecords);
+                    renderAll();
+                    showToast(`已清空今日 ${count} 条签到记录`, 'success');
+                    Logger.log(`清空了今日 ${count} 条签到记录`);
+                }
+            }
+
+            // ============================================================
+            // 摄像头
+            // ============================================================
+            let qr = null,
+                scanning = false;
+
+            function initScanner() {
+                const dot = document.getElementById('scannerDot'),
+                    status = document.getElementById('scannerStatusText');
+                if (qr) {
+                    try { qr.stop().then(() => { qr.clear();
+                            qr = null;
+                            scanning = false;
+                            dot.classList.remove('active');
+                            status.textContent = '摄像头已停止'; }).catch(() => {}); } catch (e) {}
+                }
+                try {
+                    qr = new Html5Qrcode("reader");
+                    qr.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 200 },
+                            aspectRatio: 1.0 },
+                        (decoded) => {
+                            const id = decoded.trim();
+                            const emp = getEmp(DB.getEmployees(), id);
+                            if (emp) { performCheckin(id); if (navigator.vibrate) navigator.vibrate(30); } else {
+                                showToast(`未找到学号: ${id}`, 'error');
+                                if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+                            }
+                        },
+                        () => {}
+                    ).then(() => {
+                        scanning = true;
+                        dot.classList.add('active');
+                        status.textContent = '摄像头已启动，扫描中...';
+                        document.getElementById('reader').classList.add('scan-active');
+                        showToast('📷 摄像头已启动', 'info');
+                    }).catch(() => {
+                        scanning = false;
+                        dot.classList.remove('active');
+                        status.textContent = '⚠️ 无法访问摄像头';
+                        showToast('无法访问摄像头，请检查权限', 'error');
+                    });
+                } catch (e) {
+                    scanning = false;
+                    dot.classList.remove('active');
+                    status.textContent = '⚠️ 浏览器不支持摄像头';
+                    showToast('当前浏览器不支持摄像头', 'error');
+                }
+            }
+
+            function stopScanner() {
+                if (qr && scanning) {
+                    try { qr.stop().then(() => { qr.clear();
+                            scanning = false;
+                            document.getElementById('scannerDot').classList.remove('active');
+                            document.getElementById('scannerStatusText').textContent = '摄像头已停止';
+                            document.getElementById('reader').classList.remove('scan-active'); }).catch(() => {}); } catch (
+                        e) {}
+                }
+            }
+
+            // ============================================================
+            // 导航
+            // ============================================================
+            document.querySelectorAll('#floatingNav .nav-tab').forEach(tab => {
+                tab.onclick = function() {
+                    document.querySelectorAll('#floatingNav .nav-tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    const id = this.dataset.tab;
+                    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                    document.getElementById(id).classList.add('active');
+                    if (id === 'tabCheckin') setTimeout(initScanner, 300);
+                    else stopScanner();
+                };
+            });
+
+            // ============================================================
+            // 事件绑定
+            // ============================================================
+            // 开关
+            document.getElementById('checkinToggle').onclick = function() {
+                const s = DB.getSettings();
+                s.checkinEnabled = !s.checkinEnabled;
+                DB.setSettings(s);
+                updateUI();
+                showToast(`签到功能已${s.checkinEnabled ? '开启' : '关闭'}`, 'info');
+            };
+            document.getElementById('settingToggle').onclick = function() {
+                const s = DB.getSettings();
+                s.checkinEnabled = !s.checkinEnabled;
+                DB.setSettings(s);
+                updateUI();
+                showToast(`签到功能已${s.checkinEnabled ? '开启' : '关闭'}`, 'info');
+            };
+
+            // 签到名称
+            document.getElementById('saveCheckinNameBtn').onclick = function() {
+                const name = document.getElementById('checkinNameInput').value.trim();
+                if (!name) { showToast('请输入签到名称', 'warning'); return; }
+                DB.setCheckinName(name);
+                renderAll();
+                showToast(`✅ 签到名称已更新为「${name}」`, 'success');
+            };
+            document.getElementById('resetCheckinNameBtn').onclick = function() {
+                DB.setCheckinName('');
+                renderAll();
+                showToast('已恢复默认签到名称', 'info');
+            };
+            document.getElementById('nameEditHint').onclick = function() {
+                document.querySelectorAll('#floatingNav .nav-tab').forEach(t => t.classList.remove('active'));
+                document.querySelector('#floatingNav .nav-tab[data-tab="tabAdmin"]').classList.add('active');
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                document.getElementById('tabAdmin').classList.add('active');
+                stopScanner();
+                setTimeout(() => { document.getElementById('checkinNameInput').focus();
+                    document.getElementById('checkinNameInput').select(); }, 300);
+            };
+
+            // 时间设置
+            document.getElementById('saveTimeRangeBtn').onclick = function() {
+                const sd = document.getElementById('checkinStartDate').value,
+                    st = document.getElementById('checkinStartTime').value;
+                const ed = document.getElementById('checkinEndDate').value,
+                    et = document.getElementById('checkinEndTime').value;
+                if (!sd || !st || !ed || !et) { showToast('请完整填写开始和结束的日期与时间', 'warning'); return; }
+                if (new Date(sd + 'T' + st) >= new Date(ed + 'T' + et)) { showToast('开始时间必须早于结束时间', 'warning'); return; }
+                DB.setTimeRange({ startDate: sd, startTime: st, endDate: ed, endTime: et });
+                renderAll();
+                showToast(`⏰ 签到时间已设置为 ${sd} ${st} - ${ed} ${et}`, 'success');
+            };
+            document.getElementById('clearTimeRangeBtn').onclick = function() {
+                DB.setTimeRange({ startDate: '', startTime: '', endDate: '', endTime: '' });
+                renderAll();
+                showToast('已清除签到时间设置，全天可签到', 'info');
+            };
+
+            // 手动签到
+            document.getElementById('manualCheckinBtn').onclick = function() {
+                const id = document.getElementById('manualIdInput').value.trim().toUpperCase();
+                if (!id) { showToast('请输入学号', 'warning'); return; }
+                if (performCheckin(id)) document.getElementById('manualIdInput').value = '';
+            };
+            document.getElementById('manualIdInput').onkeydown = function(e) { if (e.key === 'Enter') document.getElementById(
+                    'manualCheckinBtn').click(); };
+
+            // 添加人员
+            document.getElementById('addEmployeeBtn').onclick = function() {
+                const id = document.getElementById('addIdInput').value.trim().toUpperCase();
+                const name = document.getElementById('addNameInput').value.trim();
+                const gender = document.getElementById('addGenderInput').value;
+                if (!id) { showToast('请输入学号', 'warning'); return; }
+                if (!name) { showToast('请输入姓名', 'warning'); return; }
+                const emps = DB.getEmployees();
+                if (emps.some(e => e.id === id)) { showToast(`学号 "${id}" 已存在`, 'warning'); return; }
+                emps.push({ id, name, gender });
+                DB.setEmployees(emps);
+                renderAll();
+                document.getElementById('addIdInput').value = '';
+                document.getElementById('addNameInput').value = '';
+                document.getElementById('addGenderInput').value = '';
+                showToast(`✅ 已添加「${name}」(学号: ${id})`, 'success');
+            };
+            ['addIdInput', 'addNameInput'].forEach(id => {
+                document.getElementById(id).onkeydown = function(e) { if (e.key === 'Enter') document.getElementById(
+                        'addEmployeeBtn').click(); };
+            });
+
+            // 搜索和筛选
+            document.getElementById('searchEmployeeInput').oninput = function() { renderAll(); };
+            document.getElementById('clearSearchBtn').onclick = function() {
+                document.getElementById('searchEmployeeInput').value = '';
+                renderAll();
+            };
+            document.querySelectorAll('.gender-filter .filter-btn').forEach(btn => {
+                btn.onclick = function() {
+                    document.querySelectorAll('.gender-filter .filter-btn').forEach(b => {
+                        b.classList.remove('active', 'active-male', 'active-female');
+                    });
+                    this.classList.add('active');
+                    if (this.dataset.gender === '男') this.classList.add('active-male');
+                    else if (this.dataset.gender === '女') this.classList.add('active-female');
+                    renderAll();
+                };
+            });
+
+            // 批量选择
+            document.getElementById('toggleSelectBtn').onclick = function() {
+                selectMode = !selectMode;
+                this.textContent = selectMode ? '❌ 取消选择' : '☑️ 选择';
+                if (!selectMode) selectedTimestamps.clear();
+                renderAll();
+            };
+            document.getElementById('selectAllBtn').onclick = function() {
+                getToday(DB.getAttendance()).forEach(r => selectedTimestamps.add(r.timestamp));
+                renderAll();
+            };
+            document.getElementById('deselectAllBtn').onclick = function() {
+                selectedTimestamps.clear();
+                renderAll();
+            };
+            document.getElementById('batchDeleteBtn').onclick = batchDelete;
+
+            // 导入
+            const uploadZone = document.getElementById('uploadZone'),
+                fileInput = document.getElementById('fileInput');
+            uploadZone.onclick = () => fileInput.click();
+            uploadZone.ondragover = (e) => { e.preventDefault();
+                uploadZone.style.borderColor = 'var(--primary)';
+                uploadZone.style.background = 'rgba(238,242,255,0.6)'; };
+            uploadZone.ondragleave = () => { uploadZone.style.borderColor = 'var(--gray-300)';
+                uploadZone.style.background = 'rgba(255,255,255,0.4)'; };
+            uploadZone.ondrop = (e) => {
+                e.preventDefault();
+                uploadZone.style.borderColor = 'var(--gray-300)';
+                uploadZone.style.background = 'rgba(255,255,255,0.4)';
+                if (e.dataTransfer.files.length) { fileInput.files = e.dataTransfer.files;
+                    handleFileUpload(e.dataTransfer.files[0]); }
+            };
+            fileInput.onchange = function() { if (this.files.length) { handleFileUpload(this.files[0]);
+                    this.value = ''; } };
+
+            function handleFileUpload(file) {
+                const feedback = document.getElementById('importFeedback');
+                feedback.textContent = '⏳ 正在解析...';
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                        if (!json || !json.length) { feedback.textContent = '⚠️ 文件为空';
+                            showToast('文件为空', 'error'); return; }
+                        const headers = Object.keys(json[0]);
+                        const idKey = headers.find(h => h.includes('学号') || h.includes('编号') || h.includes('ID') || h
+                            .includes('id'));
+                        const nameKey = headers.find(h => h.includes('姓名') || h.includes('名字') || h.includes(
+                            'name') || h.includes('Name'));
+                        const genderKey = headers.find(h => h.includes('性别') || h.includes('gender') || h.includes(
+                            'Gender'));
+                        if (!idKey || !nameKey) { feedback.textContent = `⚠️ 未找到"学号"或"姓名"列`;
+                            showToast('未找到"学号"或"姓名"列', 'error'); return; }
+                        let emps = DB.getEmployees();
+                        let added = 0,
+                            skipped = 0;
+                        json.forEach(row => {
+                            const id = String(row[idKey] || '').trim();
+                            const name = String(row[nameKey] || '').trim();
+                            let gender = '';
+                            if (genderKey) { const g = String(row[genderKey] || '').trim(); if (g === '男' || g ===
+                                    '女') gender = g; }
+                            if (!id || !name) { skipped++; return; }
+                            if (emps.some(e => e.id === id)) { skipped++; return; }
+                            emps.push({ id, name, gender });
+                            added++;
+                        });
+                        DB.setEmployees(emps);
+                        renderAll();
+                        feedback.textContent = `✅ 导入完成：新增 ${added} 人${skipped ? `，跳过 ${skipped} 行` : ''}`;
+                        showToast(`导入完成，新增 ${added} 人`, 'success');
+                    } catch (err) {
+                        feedback.textContent = `❌ 解析失败: ${err.message}`;
+                        showToast('文件解析失败', 'error');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            document.getElementById('downloadTemplateBtn').onclick = function() {
+                try {
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+                        ['学号', '姓名', '性别'],
+                        ['S2024001', '张三', '男'],
+                        ['S2024002', '李四', '女'],
+                        ['S2024003', '王五', '']
+                    ]), '模板');
+                    const blob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/octet-stream' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `导入模板_${todayStr()}.xlsx`;
+                    link.click();
+                    URL.revokeObjectURL(link.href);
+                    showToast('📄 模板下载成功', 'success');
+                } catch (err) { showToast('下载失败: ' + err.message, 'error'); }
+            };
+
+            // 备份
+            document.getElementById('exportBackupBtn').onclick = function() {
+                const data = {
+                    employees: DB.getEmployees(),
+                    attendance: DB.getAttendance(),
+                    settings: DB.getSettings(),
+                    timeRange: DB.getTimeRange(),
+                    checkinName: DB.getCheckinName(),
+                    exportedAt: new Date().toISOString()
+                };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `签到备份_${todayStr()}.json`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+                showToast('💾 备份文件已导出', 'success');
+                document.getElementById('backupFeedback').textContent = '✅ 备份导出成功';
+            };
+            document.getElementById('importBackupBtn').onclick = function() { document.getElementById('backupFileInput')
+                    .click(); };
+            document.getElementById('backupFileInput').onchange = function() {
+                if (this.files.length) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const data = JSON.parse(e.target.result);
+                            if (!data.employees || !data.attendance) { showToast('备份文件格式无效', 'error'); return; }
+                            DB.setEmployees(data.employees);
+                            DB.setAttendance(data.attendance);
+                            if (data.settings) DB.setSettings(data.settings);
+                            if (data.timeRange) DB.setTimeRange(data.timeRange);
+                            if (data.checkinName) DB.setCheckinName(data.checkinName);
+                            renderAll();
+                            showToast(`📂 备份恢复成功！导入 ${data.employees.length} 名人员，${data.attendance.length} 条签到记录`,
+                                'success');
+                            document.getElementById('backupFeedback').textContent =
+                                `✅ 恢复成功，${data.employees.length} 人，${data.attendance.length} 条记录`;
+                        } catch (err) { showToast('解析备份文件失败: ' + err.message, 'error'); }
+                    };
+                    reader.readAsText(this.files[0]);
+                    this.value = '';
+                }
+            };
+
+            // 清除数据
+            document.getElementById('clearAllEmployeesBtn').onclick = async function() {
+                if (await showConfirm('删除全部人员', '确定要删除所有人员吗？签到记录将保留。')) {
+                    DB.setEmployees([]);
+                    renderAll();
+                    showToast('已删除全部人员', 'info');
+                }
+            };
+            document.getElementById('clearAllDataBtn').onclick = async function() {
+                if (await showConfirm('清除全部数据', '确定要清除所有人员和签到数据吗？此操作不可恢复！')) {
+                    DB.clearAll();
+                    renderAll();
+                    showToast('已清除全部数据', 'info');
+                    document.getElementById('backupFeedback').textContent = '🗑️ 全部数据已清除';
+                }
+            };
+
+            // ============================================================
+            // 打印功能
+            // ============================================================
+            document.getElementById('printBtn').onclick = function() {
+                renderStats();
+                setTimeout(() => {
+                    window.print();
+                }, 100);
+            };
+
+            // ============================================================
+            // 清空今日签到记录按钮
+            // ============================================================
+            document.getElementById('clearTodayBtn').onclick = clearTodayRecords;
+
+            // ============================================================
+            // 日志打印
+            // ============================================================
+            document.getElementById('printLogBtn').onclick = function() {
+                const logs = Logger.get();
+                if (!logs.length) {
+                    showToast('暂无日志可打印', 'warning');
+                    return;
+                }
+                const iframe = document.getElementById('printFrame');
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                doc.open();
+                doc.write(`<!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>系统日志</title>
+                    <style>
+                        * { margin: 0; padding: 0; box-sizing: border-box; }
+                        body {
+                            font-family: 'Courier New', monospace;
+                            padding: 20px;
+                            max-width: 800px;
+                            margin: 0 auto;
+                            background: #fff;
+                            color: #1e293b;
+                        }
+                        h1 {
+                            text-align: center;
+                            font-size: 20px;
+                            border-bottom: 2px solid #333;
+                            padding-bottom: 10px;
+                            margin-bottom: 8px;
+                        }
+                        .sub {
+                            text-align: center;
+                            color: #666;
+                            font-size: 13px;
+                            margin-bottom: 16px;
+                        }
+                        .entry {
+                            padding: 6px 8px;
+                            border-bottom: 1px solid #eee;
+                            font-size: 13px;
+                            display: flex;
+                            gap: 16px;
+                            align-items: baseline;
+                        }
+                        .entry:nth-child(even) { background: #f9fafb; }
+                        .time {
+                            color: #888;
+                            min-width: 150px;
+                            flex-shrink: 0;
+                            font-size: 12px;
+                        }
+                        .msg { color: #1e293b; word-break: break-all; }
+                        .footer {
+                            text-align: center;
+                            color: #999;
+                            font-size: 11px;
+                            margin-top: 16px;
+                            border-top: 1px solid #ddd;
+                            padding-top: 8px;
+                        }
+                        @media print {
+                            body { padding: 10px; }
+                            .entry { break-inside: avoid; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h1>📋 系统日志</h1>
+                    <div class="sub">打印时间：${new Date().toLocaleString('zh-CN', { hour12: false })}</div>
+                    ${logs.map(e => `<div class="entry"><span class="time">${e.time}</span><span class="msg">${e.message}</span></div>`).join('')}
+                    <div class="footer">共 ${logs.length} 条日志记录</div>
+                </body>
+                </html>`);
+                doc.close();
+                iframe.contentWindow.print();
+            };
+
+            // 清空日志
+            document.getElementById('clearLogBtn').onclick = async function() {
+                if (!Logger.get().length) { showToast('暂无日志可清空', 'warning'); return; }
+                if (await showConfirm('清空日志', '确定要清空所有系统日志吗？')) { Logger.clear();
+                    showToast('日志已清空', 'info'); }
+            };
+
+            // ============================================================
+            // 水印
+            // ============================================================
+            function generateWatermark() {
+                const c = document.createElement('canvas'),
+                    s = 220;
+                c.width = c.height = s;
+                const ctx = c.getContext('2d');
+                ctx.clearRect(0, 0, s, s);
+                ctx.save();
+                ctx.translate(s / 2, s / 2);
+                ctx.rotate(-30 * Math.PI / 180);
+                const now = new Date().toLocaleString('zh-CN', { hour12: false, year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                ctx.fillStyle = 'rgba(128,128,128,0.9)';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = 'bold 18px "Inter","Segoe UI",sans-serif';
+                ctx.fillText(now, 0, -14);
+                ctx.font = '20px "Inter","Segoe UI",sans-serif';
+                ctx.fillText('内部使用', 0, 24);
+                ctx.restore();
+                document.getElementById('watermarkFull').style.backgroundImage = `url(${c.toDataURL('image/png')})`;
+                document.getElementById('watermarkFull').style.backgroundSize = `${s}px ${s}px`;
+                document.getElementById('watermarkFull').style.backgroundRepeat = 'repeat';
+            }
+
+            // ============================================================
+            // 初始化
+            // ============================================================
+            function init() {
+                generateWatermark();
+                setInterval(generateWatermark, 1000);
+                Logger.init();
+                Logger.log('系统启动成功 (v3.1)');
+                if (!localStorage.getItem('attendance_settings')) DB.setSettings({ checkinEnabled: true });
+                renderAll();
+                setTimeout(initScanner, 500);
+                setInterval(() => { updateUI(); }, 60000);
+            }
+            init();
+
+            document.addEventListener('visibilitychange', function() {
+                const active = document.querySelector('.tab-panel.active');
+                if (active && active.id === 'tabCheckin') {
+                    if (document.visibilityState === 'visible') { if (!scanning) setTimeout(initScanner, 300); } else { if (
+                            scanning) stopScanner(); }
+                }
+            });
+
+            window.refreshData = renderAll;
+
+        })();
+    </script>
+
+</body>
+</html>
